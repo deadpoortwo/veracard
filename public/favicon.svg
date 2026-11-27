@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2d241b" />
+      <stop offset="55%" stop-color="#1c1611" />
+      <stop offset="100%" stop-color="#120e0b" />
+    </linearGradient>
+    <linearGradient id="vcGoldLeft" x1="12" y1="12" x2="36" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#fbf0d6" />
+      <stop offset="52%" stop-color="#e4c082" />
+      <stop offset="100%" stop-color="#b8843b" />
+    </linearGradient>
+    <linearGradient id="vcGoldRight" x1="52" y1="12" x2="30" y2="54" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#f3dfb8" />
+      <stop offset="55%" stop-color="#c9954c" />
+      <stop offset="100%" stop-color="#7c5320" />
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="16" fill="url(#bg)" />
+  <rect x="1" y="1" width="62" height="62" rx="15" stroke="#e4c082" stroke-opacity="0.22" stroke-width="2" />
+  <g transform="translate(8, 8) scale(1.5)">
+    <path d="M5.2 6.5L13.6 25.5C14.1 26.6 15.1 27.1 16 27.1L18.4 21.8L11.8 6.5H5.2Z" fill="url(#vcGoldLeft)" />
+    <path d="M26.8 6.5L18.4 25.5C17.9 26.6 16.9 27.1 16 27.1L14.2 23.0L20.4 6.5H26.8Z" fill="url(#vcGoldRight)" />
+    <path d="M16 14.2L18.3 9.2H13.7L16 14.2Z" fill="#fbf0d6" fill-opacity="0.88" />
+  </g>
+</svg>
