@@ -41,6 +41,22 @@ const VALID_PAGES = ["dashboard", "activities", "cards", "wallet", "deposit", "h
 
 const BASE_PREFIX = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
 
+const SUPPORTED_NETWORKS = [
+  { id: "BNB Chain", sub: "BEP-20 · USDT", color: "text-amber-400", chainKey: "EVM", unit: "USDT" },
+  { id: "Ethereum", sub: "ERC-20 · USDT", color: "text-indigo-400", chainKey: "EVM", unit: "USDT" },
+  { id: "Solana", sub: "SPL · SOL / USDT", color: "text-emerald-400", chainKey: "SOL", unit: "SOL" },
+  { id: "Bitcoin", sub: "NATIVE BTC", color: "text-orange-400", chainKey: "BTC", unit: "BTC" },
+  { id: "TRON", sub: "TRC-20 · USDT", color: "text-red-400", chainKey: "TRON", unit: "TRX" },
+];
+
+function addressForNetwork(wallet, netId) {
+  if (!wallet) return "";
+  const cfg = SUPPORTED_NETWORKS.find((n) => n.id === netId);
+  const key = cfg?.chainKey || "EVM";
+  if (key === "EVM") return wallet.addresses?.EVM || wallet.address || "";
+  return wallet.addresses?.[key] || "";
+}
+
 function resolvePageFromPath() {
   const stripped = BASE_PREFIX && location.pathname.startsWith(BASE_PREFIX)
     ? location.pathname.slice(BASE_PREFIX.length)
@@ -118,7 +134,8 @@ export function App({ lang, onChangeLang }) {
     return () => document.removeEventListener("click", onDoc);
   }, [chainMenuOpen]);
 
-  const addr = account?.wallet?.address || "—";
+  const activeAddr = addressForNetwork(account?.wallet, network);
+  const addr = activeAddr || account?.wallet?.address || "—";
   const shortAddr = addr.length > 12 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : addr;
   const copy = (text, label = "Copied") => {
     navigator.clipboard
@@ -349,25 +366,25 @@ export function App({ lang, onChangeLang }) {
               </button>
             </div>
             {chainMenuOpen && (
-              <div className="dropdown-pop-in absolute right-0 mt-2 w-44 rounded-xl bg-white text-zinc-900 shadow-2xl border border-zinc-200 p-1.5 z-40">
-                {["BNB Chain", "Ethereum"].map((ch) => (
+              <div className="dropdown-pop-in absolute right-0 mt-2 w-48 rounded-xl bg-white text-zinc-900 shadow-2xl border border-zinc-200 p-1.5 z-40">
+                {SUPPORTED_NETWORKS.map((ch) => (
                   <button
-                    key={ch}
+                    key={ch.id}
                     type="button"
                     onClick={() => {
-                      setNetwork(ch);
+                      setNetwork(ch.id);
                       setChainMenuOpen(false);
-                      notify(`${lang === "中文" ? "已切换至" : "Switched to"} ${ch}`, "info");
+                      notify(`${lang === "中文" ? "已切换至" : "Switched to"} ${ch.id}`, "info");
                     }}
                     className={`w-full px-2.5 py-2 rounded-lg text-xs font-medium flex items-center justify-between hover:bg-zinc-100 ${
-                      network === ch ? "bg-zinc-100 font-semibold" : ""
+                      network === ch.id ? "bg-zinc-100 font-semibold" : ""
                     }`}
                   >
                     <span className="flex items-center gap-2">
-                      <CryptoIcon symbol={ch} size={16} />
-                      <span>{ch}</span>
+                      <CryptoIcon symbol={ch.id} size={16} />
+                      <span>{ch.id}</span>
                     </span>
-                    {network === ch && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
+                    {network === ch.id && <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />}
                   </button>
                 ))}
               </div>
@@ -669,12 +686,10 @@ export function App({ lang, onChangeLang }) {
 
               {depositTab === "receive" ? (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {[
-                      { id: "BNB Chain", sub: "BEP-20 · USDT", color: "text-amber-400" },
-                      { id: "Ethereum", sub: "ERC-20 · USDT", color: "text-indigo-400" },
-                    ].map((n) => {
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {SUPPORTED_NETWORKS.map((n) => {
                       const sel = network === n.id;
+                      const netAddr = addressForNetwork(account?.wallet, n.id);
                       const bal = data?.networkBalances?.[n.id]?.usdt;
                       return (
                         <button
@@ -697,8 +712,16 @@ export function App({ lang, onChangeLang }) {
                               <div className="text-[11px] text-zinc-400">{n.sub}</div>
                             </div>
                           </div>
-                          <div className="text-[11px] font-mono text-zinc-400 mt-2.5">
-                            {bal != null ? `${Number(bal).toFixed(2)} USDT` : "— USDT"}
+                          <div className="text-[11px] font-mono text-zinc-400 mt-2.5 truncate">
+                            {n.chainKey === "EVM"
+                              ? bal != null
+                                ? `${Number(bal).toFixed(2)} USDT`
+                                : "— USDT"
+                              : netAddr
+                                ? `${netAddr.slice(0, 6)}...${netAddr.slice(-4)}`
+                                : lang === "中文"
+                                  ? "重新登录以同步地址"
+                                  : "Sign in again to sync"}
                           </div>
                         </button>
                       );
@@ -714,27 +737,44 @@ export function App({ lang, onChangeLang }) {
                         {network}
                       </span>
                     </div>
-                    <div className="inline-block p-3 rounded-2xl bg-white shadow-xl">
-                      <WalletQR value={addr} size={128} />
-                    </div>
-                    <div className="text-[11px] uppercase tracking-wider text-zinc-500">
-                      SCAN TO DEPOSIT ON {network.toUpperCase()}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => copy(addr, "Wallet Address")}
-                      className="w-full rounded-xl bg-black/25 p-3 space-y-1 hover:bg-black/35 transition"
-                    >
-                      <div className="font-mono text-xs text-zinc-200 break-all">{addr}</div>
-                      <div className="text-[10px] uppercase tracking-wider text-amber-400/80">TAP TO COPY ADDRESS</div>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => copy(addr, "Wallet Address")}
-                      className="w-full py-2.5 rounded-xl magnetic-btn bg-gradient-to-r from-[#f3dfb8] via-[#e4c082] to-[#cfa057] text-[#14110e] font-semibold text-xs"
-                    >
-                      {lang === "中文" ? "复制地址" : "Copy Wallet Address"}
-                    </button>
+                    {activeAddr ? (
+                      <>
+                        <div className="inline-block p-3 rounded-2xl bg-white shadow-xl">
+                          <WalletQR value={activeAddr} size={128} />
+                        </div>
+                        <div className="text-[11px] uppercase tracking-wider text-zinc-500">
+                          SCAN TO DEPOSIT ON {network.toUpperCase()}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => copy(activeAddr, `${network} Address`)}
+                          className="w-full rounded-xl bg-black/25 p-3 space-y-1 hover:bg-black/35 transition"
+                        >
+                          <div className="font-mono text-xs text-zinc-200 break-all">{activeAddr}</div>
+                          <div className="text-[10px] uppercase tracking-wider text-amber-400/80">TAP TO COPY ADDRESS</div>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copy(activeAddr, `${network} Address`)}
+                          className="w-full py-2.5 rounded-xl magnetic-btn bg-gradient-to-r from-[#f3dfb8] via-[#e4c082] to-[#cfa057] text-[#14110e] font-semibold text-xs"
+                        >
+                          {lang === "中文" ? "复制地址" : "Copy Wallet Address"}
+                        </button>
+                      </>
+                    ) : (
+                      <div className="py-6 space-y-2 text-xs text-zinc-400">
+                        <div>
+                          {lang === "中文"
+                            ? `当前账户尚未同步 ${network} 嵌入式钱包地址。`
+                            : `No ${network} embedded wallet address synced for this session yet.`}
+                        </div>
+                        <div className="text-[11px] text-zinc-500">
+                          {lang === "中文"
+                            ? "请确认 Dynamic 控制台已开启该链的 Embedded wallets，然后退出重新登录即可自动生成并同步。"
+                            : "Ensure Embedded Wallets is enabled for this chain in Dynamic, then sign out and sign in again to sync."}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (

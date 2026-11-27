@@ -12,8 +12,11 @@
     "test:sites": "node --test tests/sites-worker.test.mjs"
   },
   "dependencies": {
+    "@dynamic-labs/bitcoin": "^4.106.0",
     "@dynamic-labs/ethereum": "^4.94.0",
     "@dynamic-labs/sdk-react-core": "^4.94.0",
+    "@dynamic-labs/solana": "^4.106.0",
+    "@dynamic-labs/tron": "^4.106.0",
     "@vitejs/plugin-react": "5.0.4",
     "ethers": "^6.17.0",
     "jose": "^6.2.18",

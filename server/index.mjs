@@ -1,5 +1,5 @@
 import { fetchDynamicBalances } from "./dynamic-balances.mjs";
-import { createDynamicVerifier, dynamicWalletCredential, dynamicWalletProtected } from "./dynamic-auth.mjs";
+import { createDynamicVerifier, dynamicWalletCredential, dynamicWalletProtected, dynamicWalletAddresses } from "./dynamic-auth.mjs";
 import { createDb } from "./db.mjs";
 import { createServer } from "node:http";
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual, createHash } from "node:crypto";
@@ -314,15 +314,17 @@ export function createApi({
         if (wallet && wallet.address.toLowerCase() !== b.address.toLowerCase()) {
           fail(409, "Dynamic wallet address differs from bound wallet");
         }
+        const addresses = { EVM: b.address, ...dynamicWalletAddresses(identity) };
         const next = {
           provider: "dynamic",
           providerEnvironmentId: dynamicEnvironmentId,
           providerUserId: identity.subject,
           providerWalletId: credential.id,
           address: b.address,
+          addresses,
           label: b.address,
           createdAt: wallet?.createdAt || Date.now(),
-          networks: ["BNB Chain", "Ethereum"],
+          networks: ["BNB Chain", "Ethereum", "Solana", "Bitcoin", "TRON"],
           protectionCompleted: dynamicWalletProtected(credential),
           tourCompleted: wallet?.tourCompleted || false,
         };
@@ -394,7 +396,59 @@ export function createApi({
 
       if (path === "/api/wallet/balance" && req.method === "GET") {
         if (!wallet) fail(409, "Wallet not ready");
-        const eth = url.searchParams.get("network") === "Ethereum";
+        const net = url.searchParams.get("network") || "BNB Chain";
+
+        if (net === "Solana") {
+          const solAddr = wallet.addresses?.SOL;
+          if (!solAddr) return send(200, { status: "unavailable", assets: [], balance: null, message: "Solana embedded wallet not created yet." });
+          try {
+            const r = await fetch(process.env.SOL_RPC_URL || "https://api.mainnet-beta.solana.com", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "getBalance", params: [solAddr] }),
+              signal: AbortSignal.timeout(10000),
+            });
+            const j = await r.json();
+            const sol = ((j?.result?.value ?? 0) / 1e9).toString();
+            return send(200, { status: "ready", balance: null, assets: [{ symbol: "SOL", balance: sol }] });
+          } catch {
+            return send(200, { status: "unavailable", assets: [], balance: null, message: "Unable to fetch Solana balance right now." });
+          }
+        }
+
+        if (net === "Bitcoin") {
+          const btcAddr = wallet.addresses?.BTC;
+          if (!btcAddr) return send(200, { status: "unavailable", assets: [], balance: null, message: "Bitcoin embedded wallet not created yet." });
+          try {
+            const r = await fetch(`https://mempool.space/api/address/${encodeURIComponent(btcAddr)}`, {
+              signal: AbortSignal.timeout(10000),
+            });
+            const j = await r.json();
+            const sats = (j?.chain_stats?.funded_txo_sum || 0) - (j?.chain_stats?.spent_txo_sum || 0);
+            const btc = (sats / 1e8).toString();
+            return send(200, { status: "ready", balance: null, assets: [{ symbol: "BTC", balance: btc }] });
+          } catch {
+            return send(200, { status: "unavailable", assets: [], balance: null, message: "Unable to fetch Bitcoin balance right now." });
+          }
+        }
+
+        if (net === "TRON") {
+          const tronAddr = wallet.addresses?.TRON;
+          if (!tronAddr) return send(200, { status: "unavailable", assets: [], balance: null, message: "TRON embedded wallet not created yet." });
+          try {
+            const r = await fetch(`https://api.trongrid.io/v1/accounts/${encodeURIComponent(tronAddr)}`, {
+              signal: AbortSignal.timeout(10000),
+            });
+            const j = await r.json();
+            const sun = j?.data?.[0]?.balance || 0;
+            const trx = (sun / 1e6).toString();
+            return send(200, { status: "ready", balance: null, assets: [{ symbol: "TRX", balance: trx }] });
+          } catch {
+            return send(200, { status: "unavailable", assets: [], balance: null, message: "Unable to fetch TRON balance right now." });
+          }
+        }
+
+        const eth = net === "Ethereum";
         if (wallet.provider === "dynamic") {
           const identity = await checkedIdentity(req.headers["x-dynamic-token"]);
           if (identity.subject !== u.dynamic_subject || !dynamicWalletCredential(identity, wallet.address)) {

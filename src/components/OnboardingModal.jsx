@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Shield, Check, Eye, EyeOff, Loader2, X, Utensils, Repeat, Plane, ShoppingBag, Wifi } from "lucide-react";
+import { Shield, Check, CheckCircle2, Circle, Eye, EyeOff, Loader2, X, Utensils, Repeat, Plane, ShoppingBag, Wifi } from "lucide-react";
 import { CryptoIcon } from "./BrandMark.jsx";
 import { protectWallet } from "../walletService.js";
 import { createTranslator } from "../i18n.js";
@@ -170,25 +170,33 @@ export function WalletProtectionModal({ open, onClose, onComplete, lang }) {
               {[
                 { id: "A", text: lang === "中文" ? "VeraCard 客服" : "VeraCard support" },
                 { id: "B", text: lang === "中文" ? "没有人，只有我自己。" : "Nobody, only me." },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setQ1Pick(opt.id)}
-                  className={`w-full p-3.5 rounded-xl border flex items-center gap-3 text-left text-xs transition ${
-                    q1Pick === opt.id
-                      ? opt.id === "B"
-                        ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
-                        : "border-red-500/60 bg-red-500/10 text-red-300"
-                      : "border-white/[0.08] bg-zinc-950 text-zinc-200 hover:border-zinc-700"
-                  }`}
-                >
-                  <span className="w-6 h-6 rounded-lg bg-zinc-900 border border-zinc-700 flex items-center justify-center font-mono text-[11px] shrink-0">
-                    {opt.id}
-                  </span>
-                  <span>{opt.text}</span>
-                </button>
-              ))}
+              ].map((opt) => {
+                const locked = q1Pick === "B";
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => {
+                      if (!locked) setQ1Pick(opt.id);
+                    }}
+                    className={`w-full p-3.5 rounded-xl border flex items-center gap-3 text-left text-xs transition ${
+                      q1Pick === opt.id
+                        ? opt.id === "B"
+                          ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
+                          : "border-red-500/60 bg-red-500/10 text-red-300"
+                        : locked
+                          ? "border-white/[0.05] bg-zinc-950/60 text-zinc-500 opacity-50 cursor-not-allowed"
+                          : "border-white/[0.08] bg-zinc-950 text-zinc-200 hover:border-zinc-700"
+                    }`}
+                  >
+                    <span className="w-6 h-6 rounded-lg bg-zinc-900 border border-zinc-700 flex items-center justify-center font-mono text-[11px] shrink-0">
+                      {opt.id}
+                    </span>
+                    <span>{opt.text}</span>
+                  </button>
+                );
+              })}
             </div>
             {q1Pick && (
               <div className={`text-xs ${q1Pick === "B" ? "text-emerald-400" : "text-red-400"}`}>
@@ -228,25 +236,33 @@ export function WalletProtectionModal({ open, onClose, onComplete, lang }) {
               {[
                 { id: "A", text: lang === "中文" ? "绝不透露，这是诈骗。" : "Never share it, it's a scam." },
                 { id: "B", text: lang === "中文" ? "告诉对方" : "Tell them" },
-              ].map((opt) => (
-                <button
-                  key={opt.id}
-                  type="button"
-                  onClick={() => setQ2Pick(opt.id)}
-                  className={`w-full p-3.5 rounded-xl border flex items-center gap-3 text-left text-xs transition ${
-                    q2Pick === opt.id
-                      ? opt.id === "A"
-                        ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
-                        : "border-red-500/60 bg-red-500/10 text-red-300"
-                      : "border-white/[0.08] bg-zinc-950 text-zinc-200 hover:border-zinc-700"
-                  }`}
-                >
-                  <span className="w-6 h-6 rounded-lg bg-zinc-900 border border-zinc-700 flex items-center justify-center font-mono text-[11px] shrink-0">
-                    {opt.id}
-                  </span>
-                  <span>{opt.text}</span>
-                </button>
-              ))}
+              ].map((opt) => {
+                const locked = q2Pick === "A";
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => {
+                      if (!locked) setQ2Pick(opt.id);
+                    }}
+                    className={`w-full p-3.5 rounded-xl border flex items-center gap-3 text-left text-xs transition ${
+                      q2Pick === opt.id
+                        ? opt.id === "A"
+                          ? "border-emerald-500 bg-emerald-500/15 text-emerald-300"
+                          : "border-red-500/60 bg-red-500/10 text-red-300"
+                        : locked
+                          ? "border-white/[0.05] bg-zinc-950/60 text-zinc-500 opacity-50 cursor-not-allowed"
+                          : "border-white/[0.08] bg-zinc-950 text-zinc-200 hover:border-zinc-700"
+                    }`}
+                  >
+                    <span className="w-6 h-6 rounded-lg bg-zinc-900 border border-zinc-700 flex items-center justify-center font-mono text-[11px] shrink-0">
+                      {opt.id}
+                    </span>
+                    <span>{opt.text}</span>
+                  </button>
+                );
+              })}
             </div>
             {q2Pick && (
               <div className={`text-xs ${q2Pick === "A" ? "text-emerald-400" : "text-red-400"}`}>
@@ -309,8 +325,12 @@ export function WalletProtectionModal({ open, onClose, onComplete, lang }) {
                   { k: "num", txt: lang === "中文" ? "1 个数字" : "1 number" },
                   { k: "sym", txt: lang === "中文" ? "1 个特殊字符 (!@#$...)" : "1 special character (!@#$...)" },
                 ].map((r) => (
-                  <div key={r.k} className={`flex items-center gap-1.5 ${rules[r.k] ? "text-emerald-400" : "text-zinc-500"}`}>
-                    <span>{rules[r.k] ? "✓" : "○"}</span>
+                  <div key={r.k} className={`flex items-center gap-2 ${rules[r.k] ? "text-emerald-400" : "text-zinc-500"}`}>
+                    {rules[r.k] ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-400" />
+                    ) : (
+                      <Circle className="w-3.5 h-3.5 shrink-0 text-zinc-600" />
+                    )}
                     <span>{r.txt}</span>
                   </div>
                 ))}

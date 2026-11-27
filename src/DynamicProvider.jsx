@@ -11,6 +11,9 @@ import {
   DynamicEmbeddedWidget,
 } from "@dynamic-labs/sdk-react-core";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
+import { SolanaWalletConnectors } from "@dynamic-labs/solana";
+import { BitcoinWalletConnectors } from "@dynamic-labs/bitcoin";
+import { TronWalletConnectors } from "@dynamic-labs/tron";
 import { setDynamicBridge } from "./dynamicRuntime.js";
 
 function Bridge({ children }) {
@@ -48,7 +51,12 @@ export default function DynamicProvider({ children }) {
     <DynamicContextProvider
       settings={{
         environmentId: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID,
-        walletConnectors: [EthereumWalletConnectors],
+        walletConnectors: [
+          EthereumWalletConnectors,
+          SolanaWalletConnectors,
+          BitcoinWalletConnectors,
+          TronWalletConnectors,
+        ],
         appName: "VeraCard",
       }}
       theme="light"

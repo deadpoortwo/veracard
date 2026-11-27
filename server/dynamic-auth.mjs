@@ -55,3 +55,16 @@ export function dynamicWalletCredential(identity, address) {
 export function dynamicWalletProtected(credential) {
   return credential?.wallet_properties?.keyShares?.some((s) => s.passwordEncrypted === true) || false;
 }
+
+export function dynamicWalletAddresses(identity) {
+  const out = {};
+  for (const c of identity?.credentials || []) {
+    if (c.format !== "blockchain" || c.wallet_provider !== "embeddedWallet" || !c.address) continue;
+    const ch = String(c.chain || "").toUpperCase();
+    if (ch === "EVM" || ch === "EIP155") out.EVM = c.address;
+    else if (ch === "SOL" || ch === "SOLANA") out.SOL = c.address;
+    else if (ch === "BTC" || ch === "BITCOIN") out.BTC = c.address;
+    else if (ch === "TRON" || ch === "TRX") out.TRON = c.address;
+  }
+  return out;
+}
