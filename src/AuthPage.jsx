@@ -194,9 +194,9 @@ export function AuthPage({ lang, onChangeLang, initialAccount, onComplete }) {
     }
   };
 
-  const handleVerifySubmit = async (e) => {
-    e?.preventDefault();
-    const code = digits.join("");
+  const submitVerifyCode = async (codeOverride) => {
+    if (busy) return;
+    const code = typeof codeOverride === "string" ? codeOverride : digits.join("");
     if (code.length < 6) {
       setError(lang === "中文" ? "请输入完整的 6 位验证码" : "Please enter all 6 digits");
       return;
@@ -224,10 +224,22 @@ export function AuthPage({ lang, onChangeLang, initialAccount, onComplete }) {
     }
   };
 
+  const handleVerifySubmit = (e) => {
+    e?.preventDefault();
+    submitVerifyCode();
+  };
+
+  useEffect(() => {
+    if (screen === "verify") {
+      setTimeout(() => otpRefs.current[0]?.focus(), 50);
+    }
+  }, [screen]);
+
   const handleOtpChange = (idx, raw) => {
+    if (busy) return;
     const clean = raw.replace(/\D/g, "");
+    const next = [...digits];
     if (clean.length > 1) {
-      const next = [...digits];
       clean
         .slice(0, 6)
         .split("")
@@ -236,12 +248,15 @@ export function AuthPage({ lang, onChangeLang, initialAccount, onComplete }) {
         });
       setDigits(next);
       otpRefs.current[Math.min(5, idx + clean.length)]?.focus();
-      return;
+    } else {
+      next[idx] = clean.slice(0, 1);
+      setDigits(next);
+      if (next[idx] && idx < 5) otpRefs.current[idx + 1]?.focus();
     }
-    const next = [...digits];
-    next[idx] = clean.slice(0, 1);
-    setDigits(next);
-    if (next[idx] && idx < 5) otpRefs.current[idx + 1]?.focus();
+    const nextCode = next.join("");
+    if (nextCode.length === 6 && (challengeKind !== "reset" || newResetPw.length >= 8)) {
+      submitVerifyCode(nextCode);
+    }
   };
 
   const handleOtpKeyDown = (idx, e) => {
@@ -312,6 +327,7 @@ export function AuthPage({ lang, onChangeLang, initialAccount, onComplete }) {
   const isSignUp = authTab === "signup";
   const strength = getPasswordStrength(password, lang);
   const mismatch = isSignUp && confirmPw.length > 0 && password !== confirmPw;
+  const otpComplete = digits.every((d) => /^\d$/.test(d)) && (challengeKind !== "reset" || newResetPw.length >= 8);
   const pending = pendingInfo();
 
   return (
@@ -418,12 +434,13 @@ export function AuthPage({ lang, onChangeLang, initialAccount, onComplete }) {
                             type="text"
                             maxLength={6}
                             inputMode="numeric"
+                            disabled={busy}
                             value={d}
                             onChange={(e) => handleOtpChange(idx, e.target.value)}
                             onKeyDown={(e) => handleOtpKeyDown(idx, e)}
                             className={`w-full h-12 rounded-xl bg-zinc-950 border ${
                               d ? "border-amber-500/70" : "border-white/[0.08]"
-                            } focus:border-amber-500 focus:outline-none text-center font-mono text-lg font-bold text-white`}
+                            } focus:border-amber-500 focus:outline-none disabled:opacity-60 text-center font-mono text-lg font-bold text-white`}
                           />
                         ))}
                       </div>
@@ -449,8 +466,8 @@ export function AuthPage({ lang, onChangeLang, initialAccount, onComplete }) {
                       )}
                       <button
                         type="submit"
-                        disabled={busy}
-                        className="w-full py-2.5 rounded-xl magnetic-btn bg-gradient-to-r from-[#f3dfb8] via-[#e4c082] to-[#cfa057] hover:brightness-105 disabled:opacity-60 text-[#14110e] font-semibold text-sm transition flex items-center justify-center gap-2"
+                        disabled={busy || !otpComplete}
+                        className="w-full py-2.5 rounded-xl magnetic-btn bg-gradient-to-r from-[#f3dfb8] via-[#e4c082] to-[#cfa057] hover:brightness-105 disabled:opacity-45 disabled:cursor-not-allowed disabled:hover:brightness-100 text-[#14110e] font-semibold text-sm transition flex items-center justify-center gap-2"
                       >
                         {busy ? (
                           <>
