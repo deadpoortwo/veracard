@@ -33,7 +33,7 @@ jobs:
       - name: Build for GitHub Pages
         env:
           VITE_BASE_PATH: /veracard/
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || '' }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || 'https://veracard-api.onrender.com' }}
           VITE_DYNAMIC_ENVIRONMENT_ID: ${{ vars.VITE_DYNAMIC_ENVIRONMENT_ID || 'de749482-b795-4fa4-b95d-03cb47e0c972' }}
         run: |
           npm run build
