@@ -176,3 +176,43 @@ test("API rejects foreign origins and unauthenticated wallet writes", async (t) 
   });
   assert.equal(anonymous.status, 401);
 });
+
+test("API supports /api/health, allowlisted CORS preflight, and cross-site cookies", async (t) => {
+  const api = createApi({
+    database: ":memory:",
+    localMail: true,
+    dynamicEnvironmentId: null,
+    corsAllowedOrigins: ["https://deadpoortwo.github.io"],
+  });
+  await new Promise((r) => api.server.listen(0, "127.0.0.1", r));
+  t.after(() => api.close());
+  const url = "http://127.0.0.1:" + api.server.address().port;
+
+  const health = await fetch(url + "/api/health");
+  assert.equal(health.status, 200);
+  assert.equal((await health.json()).ok, true);
+
+  const preflight = await fetch(url + "/api/auth/challenge", {
+    method: "OPTIONS",
+    headers: { Origin: "https://deadpoortwo.github.io" },
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), "https://deadpoortwo.github.io");
+  assert.equal(preflight.headers.get("access-control-allow-credentials"), "true");
+
+  const c = await fetch(url + "/api/auth/challenge", {
+    method: "POST",
+    headers: { Origin: "https://deadpoortwo.github.io", "Content-Type": "application/json" },
+    body: JSON.stringify({ kind: "register", email: "cors@example.test", password: "AccountPass123!" }),
+  });
+  assert.equal(c.status, 200);
+  const { challengeId } = await c.json();
+
+  const v = await fetch(url + "/api/auth/verify", {
+    method: "POST",
+    headers: { Origin: "https://deadpoortwo.github.io", "Content-Type": "application/json" },
+    body: JSON.stringify({ challengeId, code: "111111" }),
+  });
+  assert.equal(v.status, 200);
+  assert.match(v.headers.get("set-cookie") || "", /SameSite=None; Secure/);
+});

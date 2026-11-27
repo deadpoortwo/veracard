@@ -23,9 +23,13 @@ const valid = (p) => typeof p === "string" && p.length >= 8 && p.length <= 128;
 
 export function createApi({
   database = process.env.DATABASE_PATH || "server/data/veracard.sqlite",
-  localMail = process.env.NODE_ENV !== "production",
+  localMail = process.env.NODE_ENV !== "production" || process.env.ALLOW_LOCAL_OTP === "true",
   dynamicEnvironmentId = process.env.DYNAMIC_ENVIRONMENT_ID || process.env.VITE_DYNAMIC_ENVIRONMENT_ID || null,
   dynamicKeySet,
+  corsAllowedOrigins = (process.env.CORS_ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean),
 } = {}) {
   if (database !== ":memory:") mkdirSync(dirname(resolve(database)), { recursive: true });
   const db = new DatabaseSync(database);
@@ -92,9 +96,25 @@ export function createApi({
 
   const rates = new Map();
 
+  const crossSite = corsAllowedOrigins.length > 0;
+  const cookieAttrs = crossSite
+    ? "HttpOnly; SameSite=None; Secure; Path=/"
+    : `HttpOnly; SameSite=Strict; Path=/${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
+
   const server = createServer(async (req, res) => {
+    const reqOrigin = req.headers.origin;
+    const corsHeaders = {};
+    if (reqOrigin && corsAllowedOrigins.includes(reqOrigin)) {
+      corsHeaders["Access-Control-Allow-Origin"] = reqOrigin;
+      corsHeaders["Access-Control-Allow-Credentials"] = "true";
+      corsHeaders["Access-Control-Allow-Headers"] = "Content-Type, x-dynamic-token";
+      corsHeaders["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
+      corsHeaders["Vary"] = "Origin";
+    }
+
     const send = (status, data) => {
       res.writeHead(status, {
+        ...corsHeaders,
         "Content-Type": "application/json; charset=utf-8",
         "Cache-Control": "no-store",
         "X-Content-Type-Options": "nosniff",
@@ -106,8 +126,23 @@ export function createApi({
       const url = new URL(req.url, "http://localhost");
       const path = url.pathname;
 
+      if (req.method === "OPTIONS") {
+        if (reqOrigin && !corsAllowedOrigins.includes(reqOrigin)) fail(403, "Invalid request origin");
+        res.writeHead(204, corsHeaders);
+        res.end();
+        return;
+      }
+
+      if ((path === "/api/health" || path === "/health") && req.method === "GET") {
+        return send(200, { ok: true, service: "veracard-api" });
+      }
+
       if (req.method !== "GET") {
-        if (req.headers.origin && new URL(req.headers.origin).host !== req.headers.host) {
+        if (
+          reqOrigin &&
+          new URL(reqOrigin).host !== req.headers.host &&
+          !corsAllowedOrigins.includes(reqOrigin)
+        ) {
           fail(403, "Invalid request origin");
         }
         if (!req.headers["content-type"]?.startsWith("application/json")) {
@@ -258,12 +293,7 @@ export function createApi({
         const t = randomBytes(32).toString("hex");
         db.prepare("DELETE FROM challenges WHERE id=?").run(c.id);
         db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(digest(t), u.id, Date.now() + 7 * 86400000);
-        res.setHeader(
-          "Set-Cookie",
-          `veracard_session=${t}; HttpOnly; SameSite=Strict; Path=/; Max-Age=604800${
-            process.env.NODE_ENV === "production" ? "; Secure" : ""
-          }`,
-        );
+        res.setHeader("Set-Cookie", `veracard_session=${t}; ${cookieAttrs}; Max-Age=604800`);
         return send(200, view(u));
       }
 
@@ -279,7 +309,7 @@ export function createApi({
       if (path === "/api/auth/logout" && req.method === "POST") {
         const t = tokenFromReq(req);
         if (t) db.prepare("DELETE FROM sessions WHERE token_hash=?").run(digest(t));
-        res.setHeader("Set-Cookie", "veracard_session=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0");
+        res.setHeader("Set-Cookie", `veracard_session=; ${cookieAttrs}; Max-Age=0`);
         return send(200, { ok: true });
       }
 
@@ -455,7 +485,7 @@ export function createApi({
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const { server } = createApi();
-  server.listen(Number(process.env.API_PORT || 4174), "127.0.0.1", () =>
-    console.log("VeraCard API ready on 127.0.0.1:" + (process.env.API_PORT || 4174)),
-  );
+  const port = Number(process.env.PORT || process.env.API_PORT || 4174);
+  const host = process.env.HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
+  server.listen(port, host, () => console.log(`VeraCard API ready on ${host}:${port}`));
 }
