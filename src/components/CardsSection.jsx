@@ -21,7 +21,13 @@ export function CardsSection({ cards, balance, lang, notify, reload, initialView
   const [payToken, setPayToken] = useState("USDT");
   const [revealed, setRevealed] = useState({});
   const [actName, setActName] = useState("");
-  const [actLast4, setActLast4] = useState("");
+  const [actProduct, setActProduct] = useState("VeraCard Physical Metal");
+  const [actColor, setActColor] = useState(PALETTE[1]);
+  const [actGroups, setActGroups] = useState(["", "", "", ""]);
+  const [actCode, setActCode] = useState("");
+  const [actPin, setActPin] = useState("");
+  const [actPinConfirm, setActPinConfirm] = useState("");
+  const [kycGender, setKycGender] = useState("male");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -114,12 +120,17 @@ export function CardsSection({ cards, balance, lang, notify, reload, initialView
 
   const handleActivateSubmit = async (e) => {
     e.preventDefault();
+    if (actPin.length < 4 || actPin !== actPinConfirm) {
+      notify(lang === "中文" ? "两次输入的 PIN 码不一致" : "PIN confirmation does not match", "error");
+      return;
+    }
     setBusy(true);
     try {
       await api.createCard({
-        name: actName.trim() || "VeraCard Physical",
+        name: actName.trim() || actProduct,
         type: "physical",
-        last4: actLast4.trim() || "4321",
+        color: actColor,
+        last4: actGroups[3]?.trim() || "4321",
       });
       notify(lang === "中文" ? "实体卡已激活" : "Physical card activated");
       setView("main");
@@ -313,6 +324,24 @@ export function CardsSection({ cards, balance, lang, notify, reload, initialView
                 </div>
               </div>
             </div>
+            <div className="space-y-1.5">
+              <div className="text-[11px] text-zinc-400">
+                {lang === "中文" ? "此卡需要您提供" : "What this card needs"}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                {(lang === "中文"
+                  ? ["名字", "姓氏", "手机号码", "出生日期", "国家/地区", "证件（正面、背面及自拍）", "居住地址"]
+                  : ["First name", "Last name", "Phone number", "Date of birth", "Country", "ID document (front, back & selfie)", "Residential address"]
+                ).map((item) => (
+                  <div key={item} className="px-3 py-1.5 rounded-xl bg-zinc-950 flex items-center justify-between text-[11px]">
+                    <span className="text-zinc-300">{item}</span>
+                    <span className="px-2 py-0.5 rounded bg-amber-500/15 text-amber-400 text-[10px]">
+                      {lang === "中文" ? "待提供" : "Needed"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
             <form onSubmit={handleKycSubmit} className="space-y-3.5 text-xs">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -332,6 +361,46 @@ export function CardsSection({ cards, balance, lang, notify, reload, initialView
                 <div>
                   <label className="block text-zinc-400 mb-1">{lang === "中文" ? "出生日期 *" : "Date of Birth *"}</label>
                   <input type="date" required className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 text-zinc-200 focus:outline-none" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-zinc-400 mb-1">{lang === "中文" ? "性别 *" : "Gender *"}</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { id: "male", label: lang === "中文" ? "男" : "Male" },
+                      { id: "female", label: lang === "中文" ? "女" : "Female" },
+                    ].map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setKycGender(g.id)}
+                        className={`py-2.5 rounded-xl font-medium transition ${
+                          kycGender === g.id ? "bg-amber-500/20 text-amber-300" : "bg-zinc-950 text-zinc-400"
+                        }`}
+                      >
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-zinc-400 mb-1">{lang === "中文" ? "护照号码 *" : "Passport Number *"}</label>
+                  <input type="text" required placeholder="A1234567" className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 text-white focus:outline-none" />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-zinc-400 mb-1">{lang === "中文" ? "城市 *" : "City *"}</label>
+                  <input type="text" required placeholder="Singapore" className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 text-white focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 mb-1">{lang === "中文" ? "州/省 *" : "State *"}</label>
+                  <input type="text" required placeholder="Central" className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 text-white focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-zinc-400 mb-1">{lang === "中文" ? "邮编 *" : "Postcode *"}</label>
+                  <input type="text" required placeholder="048624" className="w-full px-3 py-2.5 rounded-xl bg-zinc-950 text-white focus:outline-none" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 pt-1">
@@ -451,6 +520,11 @@ export function CardsSection({ cards, balance, lang, notify, reload, initialView
                 ))}
               </div>
             </div>
+            <div className="rounded-xl bg-white/[0.05] px-3.5 py-2.5 text-[11px] text-zinc-400">
+              {lang === "中文"
+                ? "开卡后单次最低充值金额为 $10.00 USDT。"
+                : "Minimum top-up after card creation is $10.00 USDT."}
+            </div>
             <div className="space-y-1.5">
               <div className="flex gap-2">
                 <input
@@ -525,6 +599,11 @@ export function CardsSection({ cards, balance, lang, notify, reload, initialView
               {lang === "中文" ? "当前链上 USDT 余额：" : "Live on-chain USDT balance: "}
               <span className="font-mono text-amber-300">{balance != null ? `${Number(balance).toFixed(4)} USDT` : "—"}</span>
             </div>
+            <div className="rounded-xl bg-emerald-500/10 p-3 text-[11px] text-emerald-300">
+              {lang === "中文"
+                ? "Gas 由我们代付 — 无需准备 BNB，这是一次签名授权，不会额外扣除网络费。"
+                : "Gas sponsored — network fee on us. No BNB needed. This is a signature, not a payment."}
+            </div>
             <div className="grid grid-cols-2 gap-3 pt-1">
               <button
                 type="button"
@@ -548,13 +627,36 @@ export function CardsSection({ cards, balance, lang, notify, reload, initialView
     return (
       <div className="max-w-lg mx-auto space-y-5 panel-swap-up">
         <button type="button" onClick={() => setView("main")} className="text-xs text-zinc-400 hover:text-white">
-          ← {lang === "中文" ? "返回" : "Back"}
+          ← {lang === "中文" ? "返回我的卡片" : "My Cards"}
         </button>
         <div className="rounded-3xl liquid-glass p-6 space-y-4">
-          <h1 className="text-lg font-bold text-white">{lang === "中文" ? "激活实体卡" : "Activate Your Physical Card"}</h1>
-          <form onSubmit={handleActivateSubmit} className="space-y-4">
+          <h1 className="text-lg font-bold text-white">
+            {lang === "中文" ? "激活您收到的卡片" : "Activate a card you received"}
+          </h1>
+          <form onSubmit={handleActivateSubmit} className="space-y-4 text-xs">
             <div>
-              <label className="block text-xs text-zinc-400 mb-1.5">{lang === "中文" ? "卡片昵称" : "Card Nickname"}</label>
+              <label className="block text-zinc-400 mb-1.5">
+                {lang === "中文" ? "您收到的是哪张卡？" : "Which card did you receive?"}
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {["VeraCard Physical Metal", "VeraCard Physical Standard"].map((prod) => (
+                  <button
+                    key={prod}
+                    type="button"
+                    onClick={() => setActProduct(prod)}
+                    className={`p-2.5 rounded-xl text-left transition ${
+                      actProduct === prod ? "bg-amber-500/20 text-amber-300 font-semibold" : "bg-zinc-950 text-zinc-400"
+                    }`}
+                  >
+                    {prod}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-zinc-400 mb-1.5">
+                {lang === "中文" ? "卡片名称（可选）" : "Card name (optional)"}
+              </label>
               <input
                 type="text"
                 value={actName}
@@ -564,16 +666,83 @@ export function CardsSection({ cards, balance, lang, notify, reload, initialView
               />
             </div>
             <div>
-              <label className="block text-xs text-zinc-400 mb-1.5">{lang === "中文" ? "卡号后 4 位" : "Last 4 Digits"}</label>
+              <label className="block text-zinc-400 mb-1.5">{lang === "中文" ? "卡片颜色" : "Card colour"}</label>
+              <div className="flex gap-2.5">
+                {PALETTE.map((col) => (
+                  <button
+                    key={col}
+                    type="button"
+                    onClick={() => setActColor(col)}
+                    className={`w-8 h-8 rounded-lg flex items-center justify-center transition ${
+                      actColor === col ? "ring-2 ring-amber-400 scale-105" : "opacity-70"
+                    }`}
+                    style={{ background: col }}
+                  >
+                    {actColor === col && <Check className="w-3.5 h-3.5 text-white" />}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-zinc-400 mb-1.5">
+                {lang === "中文" ? "卡号（16 位数字）" : "Card number (16 digits)"}
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {actGroups.map((val, idx) => (
+                  <input
+                    key={idx}
+                    type="text"
+                    maxLength={4}
+                    required={idx === 3}
+                    value={val}
+                    onChange={(e) => {
+                      const next = [...actGroups];
+                      next[idx] = e.target.value.replace(/\D/g, "").slice(0, 4);
+                      setActGroups(next);
+                    }}
+                    placeholder={idx === 3 ? "4321" : "0000"}
+                    className="px-2 py-2.5 rounded-xl bg-zinc-950 font-mono text-center text-xs text-white focus:outline-none"
+                  />
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="block text-zinc-400 mb-1.5">
+                {lang === "中文" ? "卡面附带激活码（如有）" : "Code printed on your card (if one came with it)"}
+              </label>
               <input
                 type="text"
-                maxLength={4}
-                required
-                value={actLast4}
-                onChange={(e) => setActLast4(e.target.value.replace(/\D/g, ""))}
-                placeholder="4321"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 font-mono text-sm text-white focus:outline-none"
+                value={actCode}
+                onChange={(e) => setActCode(e.target.value)}
+                placeholder="Optional"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 font-mono text-xs text-white focus:outline-none"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-zinc-400 mb-1.5">{lang === "中文" ? "设置 PIN 码 *" : "Set a PIN *"}</label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  required
+                  value={actPin}
+                  onChange={(e) => setActPin(e.target.value.replace(/\D/g, ""))}
+                  placeholder="4–6 digits"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 font-mono text-xs text-white focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-zinc-400 mb-1.5">{lang === "中文" ? "确认 PIN 码 *" : "Confirm PIN *"}</label>
+                <input
+                  type="password"
+                  maxLength={6}
+                  required
+                  value={actPinConfirm}
+                  onChange={(e) => setActPinConfirm(e.target.value.replace(/\D/g, ""))}
+                  placeholder="Repeat PIN"
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 font-mono text-xs text-white focus:outline-none"
+                />
+              </div>
             </div>
             <button
               type="submit"

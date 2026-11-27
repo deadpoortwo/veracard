@@ -345,6 +345,31 @@ export function WalletSection({ account, data, network, lang, onGoDeposit, notif
               </div>
             </div>
           </div>
+          <div className="rounded-3xl liquid-glass p-5 space-y-3">
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-400">
+              {lang === "中文" ? "使用流程" : "HOW IT WORKS"}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+              {[
+                lang === "中文" ? "选择法币金额与支付方式" : "Choose fiat amount & payment method",
+                lang === "中文" ? "通过 Banxa 完成快捷付款" : "Complete checkout via Banxa",
+                lang === "中文" ? "USDT 自动转入您的嵌入式钱包" : "USDT lands in your embedded wallet",
+                lang === "中文" ? "立即用于开卡与卡片充值" : "Fund cards and spend globally",
+              ].map((stepTxt, i) => (
+                <div key={i} className="p-3 rounded-xl bg-zinc-950 flex items-center gap-2.5">
+                  <span className="w-5 h-5 rounded-full bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center text-[10px] shrink-0">
+                    {i + 1}
+                  </span>
+                  <span className="text-zinc-300">{stepTxt}</span>
+                </div>
+              ))}
+            </div>
+            <div className="rounded-xl bg-amber-500/10 p-3 text-[11px] text-amber-300">
+              {lang === "中文"
+                ? "Banxa 通道会收取 1% – 3% 左右的处理费，具体汇率以结算页为准。"
+                : "Banxa charges its own processing fee (typically 1–3%)."}
+            </div>
+          </div>
         </div>
       )}
     </div>

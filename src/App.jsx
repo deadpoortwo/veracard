@@ -42,11 +42,91 @@ const VALID_PAGES = ["dashboard", "activities", "cards", "wallet", "deposit", "h
 const BASE_PREFIX = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
 
 const SUPPORTED_NETWORKS = [
-  { id: "BNB Chain", sub: "BEP-20 · USDT", color: "text-amber-400", chainKey: "EVM", unit: "USDT" },
-  { id: "Ethereum", sub: "ERC-20 · USDT", color: "text-indigo-400", chainKey: "EVM", unit: "USDT" },
-  { id: "Solana", sub: "SPL · SOL / USDT", color: "text-emerald-400", chainKey: "SOL", unit: "SOL" },
-  { id: "Bitcoin", sub: "NATIVE BTC", color: "text-orange-400", chainKey: "BTC", unit: "BTC" },
-  { id: "TRON", sub: "TRC-20 · USDT", color: "text-red-400", chainKey: "TRON", unit: "TRX" },
+  {
+    id: "BNB Chain",
+    sub: "BEP-20 · USDT",
+    color: "text-amber-400",
+    chainKey: "EVM",
+    unit: "USDT",
+    explorerName: "BSCScan",
+    explorerUrl: (a) => `https://bscscan.com/address/${a}`,
+    warningEn: "Only send USDC or USDT (BEP-20) on BNB Chain. Sending other tokens or networks may result in permanent loss.",
+    warningZh: "请仅通过 BNB Chain 发送 USDC 或 USDT (BEP-20)，转错网络或代币可能导致资产永久丢失。",
+    tokens: [
+      { symbol: "USDC", name: "USD Coin", std: "BEP-20", contract: "0x8ac76a51cc950d9822d68b83fe1ad97b32cd580d" },
+      { symbol: "USDT", name: "Tether USD", std: "BEP-20", contract: "0x55d398326f99059ff775485246999027b3197955" },
+    ],
+  },
+  {
+    id: "Ethereum",
+    sub: "ERC-20 · USDT",
+    color: "text-indigo-400",
+    chainKey: "EVM",
+    unit: "USDT",
+    explorerName: "Etherscan",
+    explorerUrl: (a) => `https://etherscan.io/address/${a}`,
+    warningEn: "Only send USDC or USDT (ERC-20) on Ethereum mainnet.",
+    warningZh: "请仅通过 Ethereum 主网发送 USDC 或 USDT (ERC-20)。",
+    tokens: [
+      { symbol: "USDC", name: "USD Coin", std: "ERC-20", contract: "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48" },
+      { symbol: "USDT", name: "Tether USD", std: "ERC-20", contract: "0xdac17f958d2ee523a2206206994597c13d831ec7" },
+    ],
+  },
+  {
+    id: "Solana",
+    sub: "SPL · SOL / USDT",
+    color: "text-emerald-400",
+    chainKey: "SOL",
+    unit: "SOL",
+    explorerName: "Solscan",
+    explorerUrl: (a) => `https://solscan.io/account/${a}`,
+    warningEn: "Only send SOL or supported SPL tokens on Solana mainnet.",
+    warningZh: "请仅通过 Solana 主网发送 SOL 或支持的 SPL 代币。",
+    tokens: [
+      { symbol: "USDC", name: "USD Coin", std: "SPL", contract: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v" },
+      { symbol: "USDT", name: "Tether USD", std: "SPL", contract: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB" },
+    ],
+  },
+  {
+    id: "Bitcoin",
+    sub: "NATIVE BTC",
+    color: "text-orange-400",
+    chainKey: "BTC",
+    unit: "BTC",
+    explorerName: "mempool.space",
+    explorerUrl: (a) => `https://mempool.space/address/${a}`,
+    warningEn: "Only send native BTC on Bitcoin mainnet. Lightning, BRC-20, and Runes are not supported.",
+    warningZh: "请仅发送原生比特币（Bitcoin 主网 BTC），不支持闪电网络、BRC-20 或 Runes。",
+    tokens: [],
+  },
+  {
+    id: "TRON",
+    sub: "TRC-20 · USDT",
+    color: "text-red-400",
+    chainKey: "TRON",
+    unit: "TRX",
+    explorerName: "Tronscan",
+    explorerUrl: (a) => `https://tronscan.org/#/address/${a}`,
+    warningEn: "Only send USDT (TRC-20) on TRON mainnet.",
+    warningZh: "请仅通过 TRON 主网发送 USDT (TRC-20)。",
+    tokens: [{ symbol: "USDT", name: "Tether USD", std: "TRC-20", contract: "TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t" }],
+  },
+];
+
+const ACTIVITY_CATEGORIES = [
+  { id: "all", en: "All", zh: "全部" },
+  { id: "deposit", en: "Deposit", zh: "充值" },
+  { id: "topup", en: "Top-ups", zh: "卡充值" },
+  { id: "purchase", en: "Purchases", zh: "购卡" },
+  { id: "spend", en: "Spend", zh: "消费" },
+  { id: "refund", en: "Refunds", zh: "退款" },
+  { id: "swap", en: "Swaps", zh: "兑换" },
+  { id: "commission_earned", en: "Commission Earned", zh: "返佣收益" },
+  { id: "commission_payout", en: "Commission Payout", zh: "返佣提现" },
+  { id: "card_status", en: "Card Status", zh: "卡片状态" },
+  { id: "rewards", en: "Rewards", zh: "奖励" },
+  { id: "identity", en: "Identity", zh: "身份验证" },
+  { id: "security", en: "Security", zh: "安全" },
 ];
 
 function addressForNetwork(wallet, netId) {
@@ -584,16 +664,16 @@ export function App({ lang, onChangeLang }) {
                   />
                 </div>
                 <div className="flex flex-wrap gap-1.5">
-                  {["all", "deposit", "Top-ups", "Purchases", "Spend", "Refunds", "Swaps"].map((tp) => (
+                  {ACTIVITY_CATEGORIES.map((tp) => (
                     <button
-                      key={tp}
+                      key={tp.id}
                       type="button"
-                      onClick={() => setActType(tp)}
+                      onClick={() => setActType(tp.id)}
                       className={`px-3 py-1 rounded-full text-[11px] transition ${
-                        actType === tp ? "bg-amber-500/20 text-amber-300 font-semibold" : "bg-white/[0.06] text-zinc-400 hover:text-zinc-200"
+                        actType === tp.id ? "bg-amber-500/20 text-amber-300 font-semibold" : "bg-white/[0.06] text-zinc-400 hover:text-zinc-200"
                       }`}
                     >
-                      {tp === "all" ? (lang === "中文" ? "全部" : "All") : tp}
+                      {lang === "中文" ? tp.zh : tp.en}
                     </button>
                   ))}
                 </div>
@@ -760,6 +840,21 @@ export function App({ lang, onChangeLang }) {
                         >
                           {lang === "中文" ? "复制地址" : "Copy Wallet Address"}
                         </button>
+                        {(() => {
+                          const netCfg = SUPPORTED_NETWORKS.find((n) => n.id === network);
+                          return netCfg ? (
+                            <div className="text-center">
+                              <a
+                                href={netCfg.explorerUrl(activeAddr)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-[11px] text-amber-400 hover:underline"
+                              >
+                                {lang === "中文" ? `在 ${netCfg.explorerName} 查看 ↗` : `View on ${netCfg.explorerName} ↗`}
+                              </a>
+                            </div>
+                          ) : null;
+                        })()}
                       </>
                     ) : (
                       <div className="py-6 space-y-2 text-xs text-zinc-400">
@@ -776,6 +871,52 @@ export function App({ lang, onChangeLang }) {
                       </div>
                     )}
                   </div>
+
+                  {(() => {
+                    const netCfg = SUPPORTED_NETWORKS.find((n) => n.id === network);
+                    if (!netCfg) return null;
+                    return (
+                      <div className="space-y-4">
+                        {netCfg.tokens.length > 0 && (
+                          <div className="space-y-3">
+                            <div className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                              {lang === "中文" ? `${network} 支持的代币` : `AVAILABLE TOKENS ON ${network.toUpperCase()}`}
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              {netCfg.tokens.map((tk) => (
+                                <div key={tk.symbol} className="float-card rounded-2xl bg-white/[0.06] p-4 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <CryptoIcon symbol={tk.symbol} size={22} />
+                                      <span className="font-bold text-white text-sm">{tk.symbol}</span>
+                                    </div>
+                                    <span className="px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 text-[10px]">{tk.std}</span>
+                                  </div>
+                                  <div className="text-xs text-zinc-400">
+                                    {tk.name} · {network}
+                                  </div>
+                                  <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-1">
+                                    <span>{lang === "中文" ? "代币合约（切勿向此转账）" : "Token Contract — Not a deposit address"}</span>
+                                    <button
+                                      type="button"
+                                      onClick={() => copy(tk.contract, `${tk.symbol} Contract`)}
+                                      className="text-amber-400 hover:underline font-mono shrink-0 ml-2"
+                                    >
+                                      {tk.contract.slice(0, 6)}...{tk.contract.slice(-4)}
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        <div className="rounded-xl bg-amber-500/10 px-4 py-3 text-xs text-amber-200/90 flex items-start gap-2.5">
+                          <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <span>{lang === "中文" ? netCfg.warningZh : netCfg.warningEn}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               ) : (
                 <div className="rounded-3xl liquid-glass p-14 text-center space-y-3">
@@ -874,6 +1015,16 @@ export function App({ lang, onChangeLang }) {
                       </button>
                     </div>
                   </div>
+                  <div className="flex flex-wrap items-center gap-3 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => copy(`https://veracard.io/ref/${data?.referral?.code || "Ver1-DSCMAU"}`, "Referral Link")}
+                      className="px-4 py-2 rounded-xl bg-gradient-to-r from-[#f3dfb8] to-[#d4a96a] text-[#14110e] font-semibold text-xs"
+                    >
+                      {lang === "中文" ? "分享给好友" : "Share with Friends"}
+                    </button>
+                    <span className="text-[11px] font-mono text-zinc-400">0 IN NETWORK · 0 DIRECT</span>
+                  </div>
                 </div>
                 <div className="shrink-0 flex flex-col items-center gap-2">
                   <div className="p-2.5 rounded-2xl bg-white">
@@ -898,6 +1049,35 @@ export function App({ lang, onChangeLang }) {
 
               <div className="rounded-3xl liquid-glass p-6 space-y-4">
                 <div className="text-sm font-bold text-white">{lang === "中文" ? "提现申请" : "Payouts"}</div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="p-3.5 rounded-xl bg-amber-500/10">
+                    <div className="text-[10px] text-amber-300 uppercase">CLAIMABLE BALANCE</div>
+                    <div className="text-base font-bold font-mono text-white mt-1">$0.00</div>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-emerald-500/10">
+                    <div className="text-[10px] text-emerald-300 uppercase">TOTAL RECEIVED</div>
+                    <div className="text-base font-bold font-mono text-white mt-1">$0.00</div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] uppercase text-zinc-500 mb-1">{lang === "中文" ? "提现金额" : "AMOUNT"}</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min="100"
+                      disabled
+                      placeholder="0.00"
+                      className="flex-1 px-3 py-2 rounded-xl bg-zinc-950 font-mono text-xs text-zinc-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => notify(lang === "中文" ? "当前可提现余额为 $0.00" : "Available balance is $0.00", "info")}
+                      className="px-3 py-2 rounded-xl bg-zinc-900 text-xs text-amber-400 font-semibold"
+                    >
+                      MAX
+                    </button>
+                  </div>
+                </div>
                 <div className="flex flex-wrap gap-2 items-center">
                   {["BSC", "Tron", "ERC20"].map((net) => (
                     <button
@@ -922,6 +1102,31 @@ export function App({ lang, onChangeLang }) {
                 >
                   {lang === "中文" ? "申请提现" : "Request payout"}
                 </button>
+                <div className="pt-3 border-t border-white/[0.07] flex items-center justify-between text-[11px] text-zinc-500">
+                  <span className="uppercase tracking-wider">RECEIVED PAYMENTS</span>
+                  <span>{lang === "中文" ? "暂无已收款记录" : "No payments received yet"}</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="rounded-2xl liquid-glass p-5 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-bold text-white">{lang === "中文" ? "我的网络" : "My Network"}</span>
+                    <span className="text-zinc-500">0 direct · 0 total</span>
+                  </div>
+                  <div className="text-xs text-zinc-500 py-3 text-center">
+                    {lang === "中文" ? "暂无下级成员" : "No one in your network yet"}
+                  </div>
+                </div>
+                <div className="rounded-2xl liquid-glass p-5 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="font-bold text-white">{lang === "中文" ? "购卡返佣" : "Card-Sale Earnings"}</span>
+                    <span className="text-emerald-400 font-mono">$0.00</span>
+                  </div>
+                  <div className="text-xs text-zinc-500 py-3 text-center">
+                    {lang === "中文" ? "暂无购卡返佣记录" : "No card-sale earnings yet"}
+                  </div>
+                </div>
               </div>
             </div>
           ) : (

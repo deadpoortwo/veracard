@@ -341,6 +341,28 @@ export function SettingsSection({ account, lang, onChangeLang, onReplayTour, onS
           {tab === "notifications" && (
             <div className="space-y-4">
               <div className="text-sm font-bold text-white">{lang === "中文" ? "通知偏好" : "Notifications"}</div>
+              <div className="rounded-xl bg-white/[0.06] p-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center">
+                    <Send className="w-4 h-4 text-amber-400" />
+                  </span>
+                  <div>
+                    <div className="text-xs font-bold text-white">
+                      {lang === "中文" ? "Telegram 通知" : "Telegram Notifications"}
+                    </div>
+                    <div className="text-[11px] text-zinc-400">
+                      {lang === "中文" ? "通过 Telegram 接收实时交易与安全提醒" : "Receive real-time alerts via Telegram"}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={openTelegramPair}
+                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#f3dfb8] to-[#d4a96a] text-[#14110e] font-semibold text-xs"
+                >
+                  {lang === "中文" ? "关联账号" : "Link Account"}
+                </button>
+              </div>
               <div className="divide-y divide-white/[0.06]">
                 {[
                   { key: "notifTx", title: lang === "中文" ? "交易实时提醒" : "Transaction Alerts", desc: lang === "中文" ? "每笔消费或入账时发送通知" : "Notify on every card spend or deposit" },
@@ -395,6 +417,31 @@ export function SettingsSection({ account, lang, onChangeLang, onReplayTour, onS
                 >
                   CN 中文
                 </button>
+              </div>
+              <div className="space-y-1.5 pt-3 border-t border-white/[0.06]">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500">
+                  {lang === "中文" ? "货币" : "CURRENCY"}
+                </div>
+                <div className="p-3 rounded-xl bg-amber-500/10 text-xs font-semibold text-amber-400">$ USD</div>
+                <div className="text-[11px] text-zinc-500">
+                  {lang === "中文" ? "目前仅支持美元结算" : "Only USD is supported at this time"}
+                </div>
+              </div>
+              <div className="space-y-2 pt-3 border-t border-white/[0.06]">
+                <div className="text-[10px] uppercase tracking-wider text-zinc-500">
+                  {lang === "中文" ? "外观" : "APPEARANCE"}
+                </div>
+                <div className="p-3.5 rounded-xl bg-zinc-950 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-white">{lang === "中文" ? "深色模式" : "Dark Mode"}</div>
+                    <div className="text-[11px] text-zinc-500">
+                      {lang === "中文" ? "应用默认使用深色主题" : "App uses dark mode by default"}
+                    </div>
+                  </div>
+                  <div className="w-10 h-5 rounded-full bg-amber-500 p-0.5 flex justify-end opacity-80">
+                    <div className="w-4 h-4 rounded-full bg-zinc-950" />
+                  </div>
+                </div>
               </div>
             </div>
           )}
