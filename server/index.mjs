@@ -1,10 +1,9 @@
 import { fetchDynamicBalances } from "./dynamic-balances.mjs";
 import { createDynamicVerifier, dynamicWalletCredential, dynamicWalletProtected } from "./dynamic-auth.mjs";
+import { createDb } from "./db.mjs";
 import { createServer } from "node:http";
-import { DatabaseSync } from "node:sqlite";
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual, createHash } from "node:crypto";
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { isAddress, verifyMessage, JsonRpcProvider, FetchRequest, formatEther, Contract, formatUnits } from "ethers";
 
@@ -22,6 +21,7 @@ const equal = (a, b) => a?.length === b?.length && timingSafeEqual(Buffer.from(a
 const valid = (p) => typeof p === "string" && p.length >= 8 && p.length <= 128;
 
 export function createApi({
+  databaseUrl = process.env.DATABASE_URL || null,
   database = process.env.DATABASE_PATH || "server/data/veracard.sqlite",
   localMail = process.env.NODE_ENV !== "production" || process.env.ALLOW_LOCAL_OTP === "true",
   dynamicEnvironmentId = process.env.DYNAMIC_ENVIRONMENT_ID || process.env.VITE_DYNAMIC_ENVIRONMENT_ID || null,
@@ -31,19 +31,7 @@ export function createApi({
     .map((s) => s.trim())
     .filter(Boolean),
 } = {}) {
-  if (database !== ":memory:") mkdirSync(dirname(resolve(database)), { recursive: true });
-  const db = new DatabaseSync(database);
-  db.exec(`PRAGMA journal_mode=WAL;
-  CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY,email TEXT UNIQUE,salt TEXT,password_hash TEXT,nonce TEXT,wallet TEXT);
-  CREATE TABLE IF NOT EXISTS challenges(id TEXT PRIMARY KEY,email TEXT,kind TEXT,salt TEXT,password_hash TEXT,code_hash TEXT,expires INTEGER,sent INTEGER,attempts INTEGER DEFAULT 0);
-  CREATE TABLE IF NOT EXISTS sessions(token_hash TEXT PRIMARY KEY,user_id TEXT,expires INTEGER);`);
-
-  if (!db.prepare("PRAGMA table_info(users)").all().some((c) => c.name === "dynamic_subject")) {
-    db.exec("ALTER TABLE users ADD COLUMN dynamic_subject TEXT");
-  }
-  if (!db.prepare("PRAGMA table_info(challenges)").all().some((c) => c.name === "provider")) {
-    db.exec("ALTER TABLE challenges ADD COLUMN provider TEXT DEFAULT 'local'");
-  }
+  const db = createDb({ databaseUrl, database });
 
   const verifyDynamic = dynamicEnvironmentId
     ? createDynamicVerifier(dynamicEnvironmentId, {
@@ -86,16 +74,14 @@ export function createApi({
       .find((x) => x.startsWith("veracard_session="))
       ?.slice(17);
 
-  const auth = (req) => {
+  const auth = async (req) => {
     const t = tokenFromReq(req);
-    const s =
-      t && db.prepare("SELECT * FROM sessions WHERE token_hash=? AND expires>?").get(digest(t), Date.now());
+    const s = t && (await db.getValidSession(digest(t), Date.now()));
     if (!s) fail(401, "Please sign in again");
-    return db.prepare("SELECT * FROM users WHERE id=?").get(s.user_id);
+    return db.getUserById(s.user_id);
   };
 
   const rates = new Map();
-
   const crossSite = corsAllowedOrigins.length > 0;
   const cookieAttrs = crossSite
     ? "HttpOnly; SameSite=None; Secure; Path=/"
@@ -134,7 +120,8 @@ export function createApi({
       }
 
       if ((path === "/api/health" || path === "/health") && req.method === "GET") {
-        return send(200, { ok: true, service: "veracard-api" });
+        await db.ready;
+        return send(200, { ok: true, service: "veracard-api", storage: db.kind });
       }
 
       if (req.method !== "GET") {
@@ -180,8 +167,8 @@ export function createApi({
         }
         if (!["register", "login", "reset"].includes(kind)) fail(400, "Invalid challenge kind");
 
-        const u = db.prepare("SELECT * FROM users WHERE email=?").get(email);
-        const last = db.prepare("SELECT sent FROM challenges WHERE email=? ORDER BY sent DESC LIMIT 1").get(email);
+        const u = await db.getUserByEmail(email);
+        const last = await db.getLatestChallengeSent(email);
         if (last && now - last.sent < 60000) fail(429, "Please wait for the countdown before resending");
         if (kind === "register" && u) fail(409, "This email is already registered, please sign in");
         if (kind === "register" && !valid(b.password)) fail(400, "Password must be 8–128 characters");
@@ -208,16 +195,22 @@ export function createApi({
           });
         }
 
-        db.prepare("DELETE FROM challenges WHERE email=?").run(email);
-        db.prepare(
-          "INSERT INTO challenges(id,email,kind,salt,password_hash,code_hash,expires,sent) VALUES(?,?,?,?,?,?,?,?)",
-        ).run(id, email, kind, salt, salt ? hash(b.password, salt) : null, digest(id + code), now + 600000, now);
-        db.prepare("UPDATE challenges SET provider=? WHERE id=?").run(provider, id);
+        await db.replaceChallenge({
+          id,
+          email,
+          kind,
+          salt,
+          passwordHash: salt ? hash(b.password, salt) : null,
+          codeHash: digest(id + code),
+          expires: now + 600000,
+          sent: now,
+          provider,
+        });
         return send(200, { challengeId: id, email, kind, authProvider: provider, resendAt: now + 60000 });
       }
 
       if (path === "/api/auth/resend" && req.method === "POST") {
-        const c = db.prepare("SELECT * FROM challenges WHERE id=?").get(b.challengeId);
+        const c = await db.getChallenge(b.challengeId);
         if (!c) fail(400, "Verification challenge expired");
         if (Date.now() - c.sent < 60000) fail(429, "Please wait for the countdown before resending");
         const code = localMail
@@ -234,17 +227,12 @@ export function createApi({
           });
         }
         const now = Date.now();
-        db.prepare("UPDATE challenges SET code_hash=?,expires=?,sent=?,attempts=0 WHERE id=?").run(
-          digest(c.id + code),
-          now + 600000,
-          now,
-          c.id,
-        );
+        await db.updateChallengeResend(c.id, digest(c.id + code), now + 600000, now);
         return send(200, { challengeId: c.id, email: c.email, kind: c.kind, authProvider: c.provider, resendAt: now + 60000 });
       }
 
       if (path === "/api/auth/verify" && req.method === "POST") {
-        const c = db.prepare("SELECT * FROM challenges WHERE id=?").get(b.challengeId);
+        const c = await db.getChallenge(b.challengeId);
         if (!c || c.expires < Date.now()) fail(400, "Verification code expired, please resend");
         if (c.attempts >= 5) fail(429, "Too many failed attempts, please restart");
 
@@ -252,54 +240,48 @@ export function createApi({
         if (c.provider === "dynamic") {
           identity = await checkedIdentity(b.dynamicToken);
           if (identity.email !== c.email) fail(403, "Dynamic verified email does not match account");
-          const linked = db.prepare("SELECT dynamic_subject FROM users WHERE email=?").get(c.email);
+          const linked = await db.getUserByEmail(c.email);
           if (linked?.dynamic_subject && linked.dynamic_subject !== identity.subject) {
             fail(403, "Dynamic account binding mismatch");
           }
         } else if (!/^\d{6}$/.test(b.code) || !equal(digest(c.id + b.code), c.code_hash)) {
-          db.prepare("UPDATE challenges SET attempts=attempts+1 WHERE id=?").run(c.id);
+          await db.incrementChallengeAttempts(c.id);
           fail(400, "Incorrect verification code");
         }
 
         if (c.kind === "reset") {
           if (!valid(b.newPassword)) fail(400, "Password must be 8–128 characters");
           const salt = randomBytes(16).toString("hex");
-          db.prepare("UPDATE users SET salt=?,password_hash=? WHERE email=?").run(
-            salt,
-            hash(b.newPassword, salt),
-            c.email,
-          );
-          db.prepare("DELETE FROM sessions WHERE user_id=(SELECT id FROM users WHERE email=?)").run(c.email);
-          db.prepare("DELETE FROM challenges WHERE id=?").run(c.id);
+          await db.updateUserPassword(c.email, salt, hash(b.newPassword, salt));
+          await db.deleteSessionsByEmail(c.email);
+          await db.deleteChallenge(c.id);
           return send(200, { reset: true });
         }
 
         if (c.kind === "register") {
-          db.prepare("INSERT INTO users(id,email,salt,password_hash,nonce) VALUES(?,?,?,?,?)").run(
-            randomUUID(),
-            c.email,
-            c.salt,
-            c.password_hash,
-            randomBytes(24).toString("hex"),
-          );
+          await db.insertUser({
+            id: randomUUID(),
+            email: c.email,
+            salt: c.salt,
+            passwordHash: c.password_hash,
+            nonce: randomBytes(24).toString("hex"),
+          });
         }
         if (identity) {
-          db.prepare(
-            "UPDATE users SET dynamic_subject=? WHERE email=? AND (dynamic_subject IS NULL OR dynamic_subject=?)",
-          ).run(identity.subject, c.email, identity.subject);
+          await db.updateUserDynamicSubject(c.email, identity.subject);
         }
 
-        const u = db.prepare("SELECT * FROM users WHERE email=?").get(c.email);
+        const u = await db.getUserByEmail(c.email);
         const t = randomBytes(32).toString("hex");
-        db.prepare("DELETE FROM challenges WHERE id=?").run(c.id);
-        db.prepare("INSERT INTO sessions VALUES(?,?,?)").run(digest(t), u.id, Date.now() + 7 * 86400000);
+        await db.deleteChallenge(c.id);
+        await db.insertSession(digest(t), u.id, Date.now() + 7 * 86400000);
         res.setHeader("Set-Cookie", `veracard_session=${t}; ${cookieAttrs}; Max-Age=604800`);
         return send(200, view(u));
       }
 
       if (path === "/api/auth/session" && req.method === "GET") {
         try {
-          return send(200, view(auth(req)));
+          return send(200, view(await auth(req)));
         } catch (e) {
           if (e.status === 401) return send(200, null);
           throw e;
@@ -308,12 +290,12 @@ export function createApi({
 
       if (path === "/api/auth/logout" && req.method === "POST") {
         const t = tokenFromReq(req);
-        if (t) db.prepare("DELETE FROM sessions WHERE token_hash=?").run(digest(t));
+        if (t) await db.deleteSession(digest(t));
         res.setHeader("Set-Cookie", `veracard_session=; ${cookieAttrs}; Max-Age=0`);
         return send(200, { ok: true });
       }
 
-      const u = auth(req);
+      const u = await auth(req);
       const wallet = u.wallet ? JSON.parse(u.wallet) : null;
 
       if (path === "/api/wallet/dynamic/sync" && req.method === "POST") {
@@ -344,7 +326,7 @@ export function createApi({
           protectionCompleted: dynamicWalletProtected(credential),
           tourCompleted: wallet?.tourCompleted || false,
         };
-        db.prepare("UPDATE users SET wallet=? WHERE id=?").run(JSON.stringify(next), u.id);
+        await db.updateUserWallet(u.id, JSON.stringify(next));
         return send(200, view({ ...u, wallet: JSON.stringify(next) }));
       }
 
@@ -374,8 +356,8 @@ export function createApi({
           tourCompleted: false,
           vault: b.vault,
         };
-        db.prepare("UPDATE users SET wallet=? WHERE id=? AND wallet IS NULL").run(JSON.stringify(w), u.id);
-        return send(200, view(db.prepare("SELECT * FROM users WHERE id=?").get(u.id)));
+        await db.updateUserWallet(u.id, JSON.stringify(w), true);
+        return send(200, view(await db.getUserById(u.id)));
       }
 
       if (path === "/api/wallet/protect" && req.method === "POST") {
@@ -399,14 +381,14 @@ export function createApi({
         }
         wallet.vault = { kind: "password", keystore: b.keystore };
         wallet.protectionCompleted = true;
-        db.prepare("UPDATE users SET wallet=? WHERE id=?").run(JSON.stringify(wallet), u.id);
+        await db.updateUserWallet(u.id, JSON.stringify(wallet));
         return send(200, view({ ...u, wallet: JSON.stringify(wallet) }));
       }
 
       if (path === "/api/wallet/tour" && req.method === "POST") {
         if (!wallet) fail(409, "Wallet not ready");
         wallet.tourCompleted = true;
-        db.prepare("UPDATE users SET wallet=? WHERE id=?").run(JSON.stringify(wallet), u.id);
+        await db.updateUserWallet(u.id, JSON.stringify(wallet));
         return send(200, view({ ...u, wallet: JSON.stringify(wallet) }));
       }
 
@@ -475,8 +457,8 @@ export function createApi({
     db,
     close: () =>
       new Promise((r) =>
-        server.close(() => {
-          db.close();
+        server.close(async () => {
+          await db.close();
           r();
         }),
       ),

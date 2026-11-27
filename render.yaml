@@ -6,11 +6,19 @@ services:
     buildCommand: npm ci
     startCommand: npm run api
     healthCheckPath: /api/health
+    buildFilter:
+      paths:
+        - server/**
+        - package.json
+        - package-lock.json
+        - render.yaml
     envVars:
       - key: NODE_VERSION
         value: 22.18.0
       - key: NODE_ENV
         value: production
+      - key: DATABASE_URL
+        sync: false
       - key: DATABASE_PATH
         value: /tmp/veracard.sqlite
       - key: DYNAMIC_ENVIRONMENT_ID
